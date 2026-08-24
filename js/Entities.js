@@ -3,6 +3,7 @@
 
 .import "Utils.js" as Utils
 .import "Items.js" as Items
+.import "World.js" as World
 
 // ─── Zombie types ───
 var ZOMBIE_TYPES = {
@@ -146,8 +147,9 @@ function updateZombie(zombie, player, world, dt, zombies, noiseEvents) {
     
     // Vision detection
     if (!attracted && distToPlayer < def.detectionRange) {
-        // Night reduces detection range
-        var detectRange = def.detectionRange * (1 - 0.3 * (1 - nightFactorForPlayer(player)));
+        // Zombies are more aggressive at night and detect further in the dark.
+        var nf = nightFactor();
+        var detectRange = def.detectionRange * (1 + 0.4 * nf);
         if (distToPlayer < detectRange) {
             zombie.state = "chase";
             zombie.targetX = player.x;
@@ -183,8 +185,20 @@ function updateZombie(zombie, player, world, dt, zombies, noiseEvents) {
         if (distToPlayer > def.attackRange + 5) {
             zombie.state = "chase";
         } else if (zombie.attackCooldown <= 0) {
-            // Attack player
             zombie.attackCooldown = def.attackSpeed;
+            if (def.ranged) {
+                // Spitter: lob an acid spit projectile toward the player.
+                var sang = Math.atan2(dy, dx);
+                var spitSpeed = 260;
+                return {
+                    type: "spit", zombie: zombie,
+                    x: zombie.x, y: zombie.y,
+                    vx: Math.cos(sang) * spitSpeed,
+                    vy: Math.sin(sang) * spitSpeed,
+                    damage: def.damage
+                };
+            }
+            // Melee attack
             return { type: "attack", damage: def.damage, zombie: zombie };
         }
         // Face the player
@@ -215,7 +229,7 @@ function updateZombie(zombie, player, world, dt, zombies, noiseEvents) {
 
 var _nightFactorCache = 1;
 function setNightFactor(nf) { _nightFactorCache = nf; }
-function nightFactorForPlayer(player) { return 1 - _nightFactorCache; }
+function nightFactor() { return _nightFactorCache; }
 
 function moveZombieWithCollision(zombie, world, dx, dy) {
     var tileSize = 32;
@@ -255,9 +269,11 @@ function isSolidAt(world, tileX, tileY) {
 }
 
 function isWalkableType(t) {
-    // Mirror World.WALKABLE
-    var walkable = [0, 1, 2, 3, 43, 7, 12, 29, 39, 40, 41, 10, 11, 27, 28, 31, 42, 36, 38];
-    return walkable.indexOf(t) >= 0;
+    // Single-source from World.WALKABLE so zombies and the player agree on what
+    // is walkable. Previously this was a hand-maintained copy that had drifted
+    // to include SANDBAG/WATER_COLLECTOR, letting zombies walk through tiles the
+    // player could not (so fortifications would not hold back the horde).
+    return !!World.WALKABLE[t];
 }
 
 function alertNearbyZombies(zombies, x, y, range) {

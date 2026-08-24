@@ -725,6 +725,32 @@ function drawProjectile(ctx, proj, cameraX, cameraY) {
     ctx.fill();
 }
 
+// ─── Draw zombie spit projectiles (acid glob with a trailing tail) ───
+function drawZombieProjectile(ctx, proj, cameraX, cameraY) {
+    var x = proj.x - cameraX;
+    var y = proj.y - cameraY;
+
+    // Trailing tail
+    ctx.strokeStyle = "rgba(140, 220, 80, 0.5)";
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+    ctx.lineTo(x - proj.vx * 0.03, y - proj.vy * 0.03);
+    ctx.stroke();
+
+    // Acid splatter halo
+    ctx.fillStyle = "rgba(120, 200, 60, 0.45)";
+    ctx.beginPath();
+    ctx.arc(x, y, 4, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Bright glob core
+    ctx.fillStyle = "#9adf4a";
+    ctx.beginPath();
+    ctx.arc(x, y, 2, 0, Math.PI * 2);
+    ctx.fill();
+}
+
 // ─── Draw ground items ───
 function drawGroundItem(ctx, item, cameraX, cameraY, tileSize) {
     var x = item.x - cameraX;

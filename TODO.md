@@ -20,6 +20,21 @@ fixed several critical logic bugs. See commit `99784f8` for the full detail.
   actually call `Entities.cleanupDead()` each tick to cap corpses at 40.
 
 ### Logic repairs
+
+**Batch 2 — gameplay fixes (night/spitters/walkable):**
+- Night detection now *increases* zombie range at night (+40%) instead of
+  shrinking it, matching "more aggressive at night". Removed the misnamed
+  `nightFactorForPlayer` (it returned a day factor); `Entities.nightFactor()`
+  now returns the real night factor.
+- Spitter zombies now lob **acid spit projectiles** (`type:"spit"`) tracked
+  in a new `zombieProjectiles` array, updated/collided in
+  `_updateZombieProjectiles`, rendered via `Render.drawZombieProjectile`.
+  Spit damages the player, stops on walls, and carries a small infection
+  chance.
+- `Entities.isWalkableType` now delegates to `World.WALKABLE` (single source)
+  so zombies and the player agree on walkable tiles — fortifications
+  (SANDBAG/WATER_COLLECTOR) will block the horde once buildable.
+
 - `equipWeapon()` now **clones** the weapon definition, so per-swing durability
   drains a per-instance copy. Previously `weapon.durability--` mutated the
   shared `Items.WEAPONS` table — breaking one bat broke every bat found for the
@@ -62,23 +77,6 @@ fixed several critical logic bugs. See commit `99784f8` for the full detail.
   reseeding — fine, but inconsistent with `generateLoot`. Pick one model.
 
 ### Zombie AI / balance
-- **Night detection looks backwards.** `updateZombie` computes
-  `detectRange = detectionRange * (1 - 0.3 * nf)`, so zombies detect the
-  player at **70% range at night** vs 100% by day — i.e. they notice you
-  *less* at night, contradicting the README's "more aggressive … at night".
-  Spawning does increase at night (correct). Decide intent and fix the
-  detection formula (and the misleadingly-named `nightFactorForPlayer`,
-  which actually returns a "day factor" = `1 - nightFactor`).
-- **Spitter zombies are melee-only.** `ZOMBIE_TYPES.spitter` has
-  `ranged: true, attackRange: 150` but no projectile logic exists in
-  `updateZombie`/`zombieAttackPlayer` — spitters just walk up and melee.
-  Implement a spit projectile (like the player's, but damaging the player).
-- **Walkable-tile tables are duplicated and drift.** `World.WALKABLE` (used
-  for the player) and `Entities.isWalkableType` (used for zombies) are two
-  separate hand-maintained lists. `Entities` extra-includes `SANDBAG` (36)
-  and `WATER_COLLECTOR` (38), so zombies can walk through sandbags while the
-  player cannot. Single-source this (e.g. `Entities` imports `World.WALKABLE`)
-  so fortifications block both consistently.
 - Corpse cleanup caps at 40 corpses but they're removed oldest-first by array
   order, which isn't strictly "oldest by death time". Fine for now; note if
   it ever matters visually.

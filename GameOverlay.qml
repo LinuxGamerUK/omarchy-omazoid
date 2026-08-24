@@ -28,6 +28,7 @@ Item {
     property var player: null
     property var zombies: []
     property var projectiles: []
+    property var zombieProjectiles: []
     property var effects: []
     property var groundItems: []
     property var noiseEvents: []
@@ -154,6 +155,7 @@ Item {
 
         zombies = []
         projectiles = []
+        zombieProjectiles = []
         effects = []
         groundItems = []
         noiseEvents = []
@@ -193,6 +195,7 @@ Item {
 
             zombies = data.zombies || []
             projectiles = []
+            zombieProjectiles = []
             effects = []
             groundItems = data.groundItems || []
             noiseEvents = []
@@ -680,6 +683,7 @@ Item {
         _updatePlayer(dt)
         _updateZombies(dt)
         _updateProjectiles(dt)
+        _updateZombieProjectiles(dt)
         _updateEffects(dt)
         _updateNoiseEvents(dt)
         _updateStats(dt)
@@ -887,6 +891,14 @@ Item {
             // Check if zombie attacked player
             if (result && result.type === "attack") {
                 _onZombieAttackPlayer(z, result)
+            } else if (result && result.type === "spit") {
+                // Spitter lobbed an acid spit — track it as a hostile projectile
+                zombieProjectiles.push({
+                    x: result.x, y: result.y,
+                    vx: result.vx, vy: result.vy,
+                    damage: result.damage,
+                    life: 2.5
+                })
             }
 
             newZombies.push(z)
@@ -969,6 +981,40 @@ Item {
             if (!hit) newProjs.push(p)
         }
         projectiles = newProjs
+    }
+
+    // Hostile projectiles (spitter acid spit) — travel, hit the player or a wall.
+    function _updateZombieProjectiles(dt) {
+        var newProjs = []
+        for (var i = 0; i < zombieProjectiles.length; i++) {
+            var p = zombieProjectiles[i]
+            p.x += p.vx * dt
+            p.y += p.vy * dt
+            p.life -= dt
+            if (p.life <= 0) continue
+
+            // Hit the player?
+            if (Utils.dist(p.x, p.y, player.x, player.y) < 12) {
+                player.health -= p.damage
+                _createBloodEffect(player.x, player.y, 4)
+                playSfx(sfxHurt)
+                // Acid spit carries a small chance of infection
+                if (!player.infected && Utils.chance(0.1)) {
+                    player.infected = true
+                    player.infectedTime = 0
+                    showMessage("Spit got in a wound! Infection risk!")
+                }
+                continue
+            }
+
+            // Hit a wall? (stop, don't pass through)
+            var tx = Math.floor(p.x / tileSize)
+            var ty = Math.floor(p.y / tileSize)
+            if (!World.isWalkable(world, tx, ty)) continue
+
+            newProjs.push(p)
+        }
+        zombieProjectiles = newProjs
     }
 
     function _updateEffects(dt) {
@@ -1552,6 +1598,11 @@ Item {
                 // Draw projectiles
                 for (var pi = 0; pi < root.projectiles.length; pi++) {
                     Render.drawProjectile(ctx, root.projectiles[pi], camX, camY)
+                }
+
+                // Draw zombie spit projectiles
+                for (var zpi = 0; zpi < root.zombieProjectiles.length; zpi++) {
+                    Render.drawZombieProjectile(ctx, root.zombieProjectiles[zpi], camX, camY)
                 }
 
                 // Draw effects
