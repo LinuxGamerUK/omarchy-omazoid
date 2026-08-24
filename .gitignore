@@ -1,0 +1,3 @@
+# Runtime game save data — keep the directory, ignore save contents
+saves/*.json
+saves/*.bak

@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "id": "io.github.LinuxGamerUK.Omazoid",
+  "name": "Omazoid",
+  "version": "0.1.0",
+  "author": "LinuxGamerUK",
+  "license": "MIT",
+  "description": "A Project Zomboid-style zombie survival game. Survive the apocalypse in a procedurally generated city with scarce resources, dangerous undead, and the eternal question: how long can you last?",
+  "kinds": ["overlay", "bar-widget"],
+  "keepLoaded": true,
+  "entryPoints": {
+    "overlay": "GameOverlay.qml",
+    "barWidget": "BarWidget.qml"
+  },
+  "barWidget": {
+    "displayName": "Omazoid",
+    "category": "Games",
+    "allowMultiple": false,
+    "defaultSection": "left"
+  }
+}
