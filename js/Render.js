@@ -697,7 +697,7 @@ function drawCorpse(ctx, zombie, cameraX, cameraY, nf) {
     ctx.restore();
 
     // Loot indicator — small sparkle if corpse has unlooted items
-    if (zombie.corpseLoot && zombie.corpseLoot.length > 0 && !zombie.corpseLooted) {
+    if (zombie.loot && zombie.loot.length > 0 && !zombie.looted) {
         var pulse = (Math.sin(Date.now() / 300) + 1) / 2;
         ctx.fillStyle = "rgba(255, 220, 100, " + (0.4 + pulse * 0.4) + ")";
         ctx.beginPath();

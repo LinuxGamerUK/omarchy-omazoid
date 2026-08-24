@@ -18,7 +18,7 @@ A Project Zomboid-style zombie survival game built as an Omarchy shell plugin. S
 ## Install
 
 ```sh
-omarchy plugin add https://github.com/LinuxGamerUK/Omazoid.git --enable --yes
+omarchy plugin add https://github.com/LinuxGamerUK/omarchy-omazoid.git --enable --yes
 ```
 
 ## Usage
