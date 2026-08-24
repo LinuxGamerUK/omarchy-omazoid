@@ -7,13 +7,13 @@ import qs.Ui
 
 Panel {
     id: root
-    moduleName: "io.github.LinuxGamerUK.Omazoid"
+    moduleName: "com.github.LinuxGamerUK.Omazoid"
     manageIpc: false
 
     property var anchorItem: null
     property var hostWidget: null
     property bool hasSave: false
-    property string saveFile: Quickshell.env("HOME") + "/.config/omarchy/plugins/io.github.LinuxGamerUK.Omazoid/saves/save.json"
+    property string saveFile: Quickshell.env("HOME") + "/.config/omarchy/plugins/com.github.LinuxGamerUK.Omazoid/saves/save.json"
 
     function open() {
         root.controller.show()
@@ -33,7 +33,7 @@ Panel {
 
     function launchGame() {
         summonProc.command = ["omarchy-shell", "shell", "summon",
-            "io.github.LinuxGamerUK.Omazoid", "{}"]
+            "com.github.LinuxGamerUK.Omazoid", "{}"]
         summonProc.running = true
         root.close()
     }

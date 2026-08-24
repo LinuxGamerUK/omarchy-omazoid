@@ -59,13 +59,13 @@ All audio is generated with ffmpeg and bundled as OGG files in the `audio/` dire
 ## Configure
 
 ```sh
-omarchy bar move io.github.LinuxGamerUK.Omazoid --section left
+omarchy bar move com.github.LinuxGamerUK.Omazoid --section left
 ```
 
 ## Remove
 
 ```sh
-omarchy plugin remove io.github.LinuxGamerUK.Omazoid
+omarchy plugin remove com.github.LinuxGamerUK.Omazoid
 ```
 
 ## How It Works
@@ -75,7 +75,7 @@ Omazoid runs as an Omarchy shell plugin with two entry points:
 - **`overlay`** (`GameOverlay.qml`) — the fullscreen game with Canvas-based tile rendering, entity management, and game loop
 - **`bar-widget`** (`BarWidget.qml` + `Panel.qml`) — a bar chip with a launch panel
 
-The game uses `keepLoaded: true` so state persists in memory between sessions. Save files are stored in `~/.config/omarchy/plugins/io.github.LinuxGamerUK.Omazoid/saves/save.json`.
+The game uses `keepLoaded: true` so state persists in memory between sessions. Save files are stored in `~/.config/omarchy/plugins/com.github.LinuxGamerUK.Omazoid/saves/save.json`.
 
 ### Architecture
 

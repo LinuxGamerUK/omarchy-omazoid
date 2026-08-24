@@ -6,7 +6,7 @@ import qs.Ui
 
 BarWidget {
     id: root
-    moduleName: "io.github.LinuxGamerUK.Omazoid"
+    moduleName: "com.github.LinuxGamerUK.Omazoid"
 
     readonly property bool opened: panelLoader.item
         ? panelLoader.item.opened === true
@@ -45,7 +45,7 @@ BarWidget {
 
     // Check for save file to show status
     property bool hasSave: false
-    property string saveFile: Quickshell.env("HOME") + "/.config/omarchy/plugins/io.github.LinuxGamerUK.Omazoid/saves/save.json"
+    property string saveFile: Quickshell.env("HOME") + "/.config/omarchy/plugins/com.github.LinuxGamerUK.Omazoid/saves/save.json"
 
     Component.onCompleted: {
         checkSaveProc.command = ["bash", "-c", "test -f '" + saveFile + "' && echo YES || echo NO"]

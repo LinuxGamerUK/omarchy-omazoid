@@ -17,7 +17,7 @@ Item {
     // ─── Lifecycle ───
     property bool opened: false
     property string omarchyPath: Quickshell.env("OMARCHY_PATH")
-    property string saveDir: Quickshell.env("HOME") + "/.config/omarchy/plugins/io.github.LinuxGamerUK.Omazoid/saves"
+    property string saveDir: Quickshell.env("HOME") + "/.config/omarchy/plugins/com.github.LinuxGamerUK.Omazoid/saves"
     property string saveFile: saveDir + "/save.json"
     property bool saveExists: false
     property bool saveChecked: false
