@@ -2349,13 +2349,12 @@ Item {
             }
         }
     }
-}
 
     // ════════════════════════════════════════════════
     // Reusable components
     // ════════════════════════════════════════════════
 
-    component StatBar : Rectangle {
+    component StatBar: Rectangle {
         property string label: ""
         property real value: 0
         property real maxValue: 100
@@ -2385,7 +2384,7 @@ Item {
         }
     }
 
-    component MenuButton : Rectangle {
+    component MenuButton: Rectangle {
         property string text: ""
         property string subtext: ""
         property bool small: false
@@ -2426,3 +2425,4 @@ Item {
             }
         }
     }
+}
