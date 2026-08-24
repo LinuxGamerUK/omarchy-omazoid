@@ -107,7 +107,10 @@ Item {
 
     function checkSaveFile() {
         saveChecked = true
-        checkSaveProc.command = ["test", "-f", saveFile, "&&", "echo", "EXISTS"]
+        // Run via a shell so `&&` actually short-circuits; passing it as a raw
+        // arg to `test` always failed, so `saveExists` stayed false and the
+        // Continue button never appeared on the start menu.
+        checkSaveProc.command = ["bash", "-c", "test -f '" + saveFile + "' && echo EXISTS"]
         checkSaveProc.running = true
     }
 
@@ -253,7 +256,12 @@ Item {
     function equipWeapon(weaponId) {
         var w = Items.getItem(weaponId)
         if (w && Items.isWeapon(w)) {
-            player.equippedWeapon = w
+            // Clone the def so per-instance durability doesn't mutate the shared
+            // Items.WEAPONS table (otherwise breaking one bat breaks every bat
+            // you find for the rest of the run).
+            var copy = {}
+            for (var k in w) copy[k] = w[k]
+            player.equippedWeapon = copy
             _refreshPlayer()
             showMessage("Equipped: " + w.name)
         }
@@ -319,6 +327,15 @@ Item {
                 return
             }
         }
+    }
+
+    // Count of a given item id currently in the player's inventory (0 if none).
+    function _invCount(itemId) {
+        if (!player) return 0
+        for (var i = 0; i < player.inventory.length; i++) {
+            if (player.inventory[i].id === itemId) return player.inventory[i].count
+        }
+        return 0
     }
 
     function _addToInventory(itemId, count) {
@@ -418,13 +435,16 @@ Item {
 
     function _fireRangedWeapon(weapon) {
         var ammoType = weapon.ammoType
-        if (player.equippedAmmo[ammoType] <= 0) {
+        // Ammo lives in the inventory (loot adds it there); draw from it directly
+        // so picked-up ammo is actually usable. The legacy equippedAmmo tracker
+        // was only ever decremented, never refilled, so guns could never fire.
+        if (_invCount(ammoType) <= 0) {
             showMessage("No ammo!")
             player.attackPhase = 0
             return
         }
 
-        player.equippedAmmo[ammoType]--
+        _removeFromInventory(ammoType, 1)
         playSfx(sfxGunshot)
 
         if (weapon.id === "shotgun") {
@@ -676,13 +696,11 @@ Item {
             trySpawnZombies()
         }
 
-        // Clean up dead zombies every tick — prevents memory accumulation
+        // Clean up dead zombies and cap corpse count — prevents memory accumulation.
+        // cleanupDead() removes any "dead"-state zombies and trims the oldest
+        // corpses once there are more than 40, so long sessions don't leak.
         if (zombies.length > 0) {
-            var hasDead = false
-            for (var _d = 0; _d < zombies.length; _d++) {
-                if (zombies[_d].state === "dead") { hasDead = true; break 
-            }
-            if (hasDead) zombies = Entities.cleanupDead(zombies)
+            zombies = Entities.cleanupDead(zombies)
         }
 
         // Auto-save
@@ -1096,8 +1114,8 @@ Item {
         }
     }
 
-    Process { id: saveProc 
-    Process { id: deleteSaveProc 
+    Process { id: saveProc }
+    Process { id: deleteSaveProc }
     Process { id: wsProc }  // Hyprland workspace dispatch
     Process { id: floatProc }  // Toggle floating mode for game window
 
@@ -1116,46 +1134,46 @@ Item {
             id: ambientOutput
             volume: root.audioMuted ? 0 : root.audioVolume * 0.35
         }
-        onSourceChanged: { if (root.gameState === "playing") ambientPlayer.play() 
+        onSourceChanged: { if (root.gameState === "playing") ambientPlayer.play() }
     }
 
     // SFX players — one per sound for instant playback
-    SoundEffect { id: sfxSwing;      source: audioDir + "sfx_swing.wav";         volume: root.audioMuted ? 0 : root.sfxVolume 
-    SoundEffect { id: sfxHit;        source: audioDir + "sfx_hit.wav";           volume: root.audioMuted ? 0 : root.sfxVolume 
-    SoundEffect { id: sfxGunshot;    source: audioDir + "sfx_gunshot.wav";       volume: root.audioMuted ? 0 : root.sfxVolume 
-    SoundEffect { id: sfxDoorOpen;   source: audioDir + "sfx_door_open.wav";    volume: root.audioMuted ? 0 : root.sfxVolume 
-    SoundEffect { id: sfxDoorClose;  source: audioDir + "sfx_door_close.wav";   volume: root.audioMuted ? 0 : root.sfxVolume 
-    SoundEffect { id: sfxPickup;     source: audioDir + "sfx_pickup.wav";       volume: root.audioMuted ? 0 : root.sfxVolume 
-    SoundEffect { id: sfxEat;        source: audioDir + "sfx_eat.wav";          volume: root.audioMuted ? 0 : root.sfxVolume 
-    SoundEffect { id: sfxHurt;       source: audioDir + "sfx_hurt.wav";         volume: root.audioMuted ? 0 : root.sfxVolume 
-    SoundEffect { id: sfxHeartbeat;  source: audioDir + "sfx_heartbeat.wav";    volume: root.audioMuted ? 0 : root.sfxVolume * 0.7 
-    SoundEffect { id: sfxGroan;      source: audioDir + "sfx_zombie_groan.wav";  volume: root.audioMuted ? 0 : root.sfxVolume * 0.5 
-    SoundEffect { id: sfxNewDay;     source: audioDir + "sfx_newday.wav";       volume: root.audioMuted ? 0 : root.sfxVolume * 0.6 
-    SoundEffect { id: sfxClick;      source: audioDir + "sfx_click.wav";        volume: root.audioMuted ? 0 : root.sfxVolume * 0.4 
+    SoundEffect { id: sfxSwing;      source: audioDir + "sfx_swing.wav";         volume: root.audioMuted ? 0 : root.sfxVolume }
+    SoundEffect { id: sfxHit;        source: audioDir + "sfx_hit.wav";           volume: root.audioMuted ? 0 : root.sfxVolume }
+    SoundEffect { id: sfxGunshot;    source: audioDir + "sfx_gunshot.wav";       volume: root.audioMuted ? 0 : root.sfxVolume }
+    SoundEffect { id: sfxDoorOpen;   source: audioDir + "sfx_door_open.wav";    volume: root.audioMuted ? 0 : root.sfxVolume }
+    SoundEffect { id: sfxDoorClose;  source: audioDir + "sfx_door_close.wav";   volume: root.audioMuted ? 0 : root.sfxVolume }
+    SoundEffect { id: sfxPickup;     source: audioDir + "sfx_pickup.wav";       volume: root.audioMuted ? 0 : root.sfxVolume }
+    SoundEffect { id: sfxEat;        source: audioDir + "sfx_eat.wav";          volume: root.audioMuted ? 0 : root.sfxVolume }
+    SoundEffect { id: sfxHurt;       source: audioDir + "sfx_hurt.wav";         volume: root.audioMuted ? 0 : root.sfxVolume }
+    SoundEffect { id: sfxHeartbeat;  source: audioDir + "sfx_heartbeat.wav";    volume: root.audioMuted ? 0 : root.sfxVolume * 0.7 }
+    SoundEffect { id: sfxGroan;      source: audioDir + "sfx_zombie_groan.wav";  volume: root.audioMuted ? 0 : root.sfxVolume * 0.5 }
+    SoundEffect { id: sfxNewDay;     source: audioDir + "sfx_newday.wav";       volume: root.audioMuted ? 0 : root.sfxVolume * 0.6 }
+    SoundEffect { id: sfxClick;      source: audioDir + "sfx_click.wav";        volume: root.audioMuted ? 0 : root.sfxVolume * 0.4 }
 
     // Footstep sounds (per surface type)
-    SoundEffect { id: sfxStepGrass;    source: audioDir + "sfx_step_grass.wav";    volume: root.audioMuted ? 0 : root.sfxVolume * 0.3 
-    SoundEffect { id: sfxStepRoad;     source: audioDir + "sfx_step_road.wav";     volume: root.audioMuted ? 0 : root.sfxVolume * 0.3 
-    SoundEffect { id: sfxStepWood;     source: audioDir + "sfx_step_wood.wav";     volume: root.audioMuted ? 0 : root.sfxVolume * 0.3 
-    SoundEffect { id: sfxStepConcrete; source: audioDir + "sfx_step_concrete.wav"; volume: root.audioMuted ? 0 : root.sfxVolume * 0.3 
+    SoundEffect { id: sfxStepGrass;    source: audioDir + "sfx_step_grass.wav";    volume: root.audioMuted ? 0 : root.sfxVolume * 0.3 }
+    SoundEffect { id: sfxStepRoad;     source: audioDir + "sfx_step_road.wav";     volume: root.audioMuted ? 0 : root.sfxVolume * 0.3 }
+    SoundEffect { id: sfxStepWood;     source: audioDir + "sfx_step_wood.wav";     volume: root.audioMuted ? 0 : root.sfxVolume * 0.3 }
+    SoundEffect { id: sfxStepConcrete; source: audioDir + "sfx_step_concrete.wav"; volume: root.audioMuted ? 0 : root.sfxVolume * 0.3 }
 
     // Weapon-specific swing sounds
-    SoundEffect { id: sfxSwingBlade;   source: audioDir + "sfx_swing_blade.wav";   volume: root.audioMuted ? 0 : root.sfxVolume 
-    SoundEffect { id: sfxSwingBlunt;   source: audioDir + "sfx_swing_blunt.wav";    volume: root.audioMuted ? 0 : root.sfxVolume 
-    SoundEffect { id: sfxSwingMetal;   source: audioDir + "sfx_swing_metal.wav";    volume: root.audioMuted ? 0 : root.sfxVolume 
-    SoundEffect { id: sfxSwingFist;    source: audioDir + "sfx_swing_fist.wav";     volume: root.audioMuted ? 0 : root.sfxVolume * 0.6 
+    SoundEffect { id: sfxSwingBlade;   source: audioDir + "sfx_swing_blade.wav";   volume: root.audioMuted ? 0 : root.sfxVolume }
+    SoundEffect { id: sfxSwingBlunt;   source: audioDir + "sfx_swing_blunt.wav";    volume: root.audioMuted ? 0 : root.sfxVolume }
+    SoundEffect { id: sfxSwingMetal;   source: audioDir + "sfx_swing_metal.wav";    volume: root.audioMuted ? 0 : root.sfxVolume }
+    SoundEffect { id: sfxSwingFist;    source: audioDir + "sfx_swing_fist.wav";     volume: root.audioMuted ? 0 : root.sfxVolume * 0.6 }
 
     // Weapon-specific hit sounds
-    SoundEffect { id: sfxHitBlade;    source: audioDir + "sfx_hit_blade.wav";     volume: root.audioMuted ? 0 : root.sfxVolume 
-    SoundEffect { id: sfxHitBlunt;    source: audioDir + "sfx_hit_blunt.wav";     volume: root.audioMuted ? 0 : root.sfxVolume 
+    SoundEffect { id: sfxHitBlade;    source: audioDir + "sfx_hit_blade.wav";     volume: root.audioMuted ? 0 : root.sfxVolume }
+    SoundEffect { id: sfxHitBlunt;    source: audioDir + "sfx_hit_blunt.wav";     volume: root.audioMuted ? 0 : root.sfxVolume }
 
     // Zombie grumbles (3 variants for atmosphere)
-    SoundEffect { id: sfxGrumble1;    source: audioDir + "sfx_zombie_grumble1.wav"; volume: root.audioMuted ? 0 : root.sfxVolume * 0.4 
-    SoundEffect { id: sfxGrumble2;    source: audioDir + "sfx_zombie_grumble2.wav"; volume: root.audioMuted ? 0 : root.sfxVolume * 0.4 
-    SoundEffect { id: sfxGrumble3;    source: audioDir + "sfx_zombie_grumble3.wav"; volume: root.audioMuted ? 0 : root.sfxVolume * 0.4 
+    SoundEffect { id: sfxGrumble1;    source: audioDir + "sfx_zombie_grumble1.wav"; volume: root.audioMuted ? 0 : root.sfxVolume * 0.4 }
+    SoundEffect { id: sfxGrumble2;    source: audioDir + "sfx_zombie_grumble2.wav"; volume: root.audioMuted ? 0 : root.sfxVolume * 0.4 }
+    SoundEffect { id: sfxGrumble3;    source: audioDir + "sfx_zombie_grumble3.wav"; volume: root.audioMuted ? 0 : root.sfxVolume * 0.4 }
 
     // Zombie death sound
-    SoundEffect { id: sfxZombieDeath; source: audioDir + "sfx_zombie_death.wav";  volume: root.audioMuted ? 0 : root.sfxVolume * 0.6 
+    SoundEffect { id: sfxZombieDeath; source: audioDir + "sfx_zombie_death.wav";  volume: root.audioMuted ? 0 : root.sfxVolume * 0.6 }
 
     // Helper: get weapon-appropriate swing sound
     function getSwingSound(weapon) {
@@ -1729,7 +1747,7 @@ Item {
                     anchors.verticalCenter: parent.verticalCenter
                 }
 
-                Item { width: parent.width - 400; height: 1 
+                Item { width: parent.width - 400; height: 1 } 
             }
         }
 
@@ -1818,7 +1836,7 @@ Item {
                         if (!root.player || !root.player.equippedWeapon) return ""
                         var w = root.player.equippedWeapon
                         if (w.cat === "ranged") {
-                            var ammo = root.player.equippedAmmo[w.ammoType] || 0
+                            var ammo = root._invCount(w.ammoType)
                             return "Ammo: " + ammo
                         }
                         if (w.durability > 0) return "Durability: " + w.durability
@@ -1891,7 +1909,7 @@ Item {
                     anchors.horizontalCenter: parent.horizontalCenter
                 }
 
-                Item { width: 1; height: 20 
+                Item { width: 1; height: 20 }
 
                 // Continue button (only if save exists)
                 MenuButton {
@@ -1917,7 +1935,7 @@ Item {
                     anchors.horizontalCenter: parent.horizontalCenter
                 }
 
-                Item { width: 1; height: 10 
+                Item { width: 1; height: 10 }
 
                 Text {
                     text: "WASD: Move | Mouse: Aim | Click: Attack | Scroll: Zoom\nE: Interact/Doors | I: Inventory | F: Flashlight | M: Mute\nShift: Run | Esc: Pause | Super+W: Quit | Super+1-0: Workspace"
@@ -1957,11 +1975,11 @@ Item {
                     anchors.horizontalCenter: parent.horizontalCenter
                 }
 
-                Item { width: 1; height: 10 
+                Item { width: 1; height: 10 }
 
                 MenuButton {
                     text: "Resume"
-                    }
+                    onClicked: {
                         root.gameState = "playing"
                         root.gameTimer.running = true
                         root.gameCanvas.requestPaint()
@@ -1972,7 +1990,7 @@ Item {
                 MenuButton {
                     text: "Hide Game"
                     subtext: "Pause and free your screen — click 🧟 Omazoid to resume"
-                    }
+                    onClicked: {
                         root.saveGame()
                         root.gameTimer.running = false
                         root.opened = false
@@ -1983,7 +2001,7 @@ Item {
 
                 MenuButton {
                     text: "Save & Quit"
-                    }
+                    onClicked: {
                         root.saveGame()
                         root.close()
                     }
@@ -2029,11 +2047,11 @@ Item {
                     anchors.horizontalCenter: parent.horizontalCenter
                 }
 
-                Item { width: 1; height: 20 
+                Item { width: 1; height: 20 }
 
                 MenuButton {
                     text: root.permadeath ? "New Game" : "Respawn at Last Save"
-                    }
+                    onClicked: {
                         if (root.permadeath) {
                             root.gameState = "menu"
                         } else {
@@ -2149,7 +2167,7 @@ Item {
                                         id: invMouse
                                         anchors.fill: parent
                                         hoverEnabled: true
-                                        }
+                                        onClicked: {
                                             if (invItem) root.useItem(invItem.id)
                                         }
                                     }
@@ -2331,6 +2349,7 @@ Item {
             }
         }
     }
+}
 
     // ════════════════════════════════════════════════
     // Reusable components
