@@ -751,6 +751,16 @@ function drawZombieProjectile(ctx, proj, cameraX, cameraY) {
     ctx.fill();
 }
 
+// ─── Generic small health bar (used for damaged fortifications) ───
+// ratio is 0..1 of current/max health. Draws a 2px bar centred at x,y.
+function drawHealthBar(ctx, x, y, w, ratio) {
+    ratio = Math.max(0, Math.min(1, ratio));
+    ctx.fillStyle = "rgba(0,0,0,0.6)";
+    ctx.fillRect(x - w/2, y, w, 2);
+    ctx.fillStyle = ratio > 0.5 ? "#5acf3a" : (ratio > 0.25 ? "#cfa53a" : "#cf3a3a");
+    ctx.fillRect(x - w/2, y, w * ratio, 2);
+}
+
 // ─── Draw ground items ───
 function drawGroundItem(ctx, item, cameraX, cameraY, tileSize) {
     var x = item.x - cameraX;

@@ -126,6 +126,23 @@ var AMMO = {
     "rifle_ammo": { id: "rifle_ammo", name: "Rifle Ammo", cat: CAT.AMMO, weight: 0.1, stackable: true, maxStack: 50 }
 };
 
+// ─── Build recipes (crafting / fortification) ───
+// tile values mirror World.T so the engine stays in sync with the tile set.
+var RECIPES = {
+    "barricade": {
+        id: "barricade", name: "Barricade",
+        tile: 26,            // World.T.BARRICADE — solid barrier, zombies beat it down
+        materials: { wood_plank: 3, nails: 2 },
+        hp: 100, blocks: true
+    },
+    "barbed_wire": {
+        id: "barbed_wire", name: "Barbed Wire",
+        tile: 35,            // World.T.BARBED_WIRE — passable, shreds zombies walking through
+        materials: { metal_scrap: 2 },
+        hp: 60, blocks: false, damagePerSecond: 6
+    }
+};
+
 // ─── All items registry ───
 var ALL_ITEMS = {};
 function _register(obj) {

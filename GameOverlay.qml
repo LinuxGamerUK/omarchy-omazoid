@@ -32,6 +32,7 @@ Item {
     property var effects: []
     property var groundItems: []
     property var noiseEvents: []
+    property var barricades: ({})   // "x,y" -> {recipeId,tile,base,hp,maxHp,blocks,damagePerSecond}
     property int gameDay: 1
     property real gameHour: 8.0
     property bool permadeath: false
@@ -159,6 +160,7 @@ Item {
         effects = []
         groundItems = []
         noiseEvents = []
+        barricades = ({})
         gameDay = 1
         gameHour = 8.0
         killCount = 0
@@ -199,6 +201,7 @@ Item {
             effects = []
             groundItems = data.groundItems || []
             noiseEvents = []
+            barricades = data.barricades || ({})
             gameDay = data.gameDay || 1
             gameHour = data.gameHour || 8.0
             permadeath = data.permadeath || false
@@ -227,6 +230,7 @@ Item {
             player: _serializePlayer(player),
             zombies: zombies,
             groundItems: groundItems,
+            barricades: barricades,
             gameDay: gameDay,
             gameHour: gameHour,
             permadeath: permadeath,
@@ -686,6 +690,7 @@ Item {
         _updateZombieProjectiles(dt)
         _updateEffects(dt)
         _updateNoiseEvents(dt)
+        _updateBarricades(dt)
         _updateStats(dt)
 
         // Audio: ambient switching, zombie groans, heartbeat
@@ -1015,6 +1020,149 @@ Item {
             newProjs.push(p)
         }
         zombieProjectiles = newProjs
+    }
+
+    // ════════════════════════════════════════════════
+    // Crafting / fortification (build menu, B key)
+    // ════════════════════════════════════════════════
+
+    // List of recipe ids for the build menu's Repeater.
+    function recipeIds() {
+        return Object.keys(Items.RECIPES)
+    }
+
+    // Human-readable "have/need" summary for a recipe's materials.
+    function recipeMaterials(recipeId) {
+        var r = Items.RECIPES[recipeId]
+        if (!r) return ""
+        var parts = []
+        for (var mat in r.materials) {
+            var def = Items.getItem(mat)
+            var name = def ? def.name : mat
+            parts.push(name + " " + _invCount(mat) + "/" + r.materials[mat])
+        }
+        return parts.join("  ·  ")
+    }
+
+    function canCraft(recipeId) {
+        var r = Items.RECIPES[recipeId]
+        if (!r) return false
+        for (var mat in r.materials) {
+            if (_invCount(mat) < r.materials[mat]) return false
+        }
+        return true
+    }
+
+    // Build a recipe on the tile directly in front of the player (facing dir).
+    function tryBuild(recipeId) {
+        if (!player || !world) return
+        var r = Items.RECIPES[recipeId]
+        if (!r) return
+        if (!canCraft(recipeId)) {
+            showMessage("Not enough materials for " + r.name)
+            return
+        }
+
+        var fx = Math.round(Math.cos(player.facing))
+        var fy = Math.round(Math.sin(player.facing))
+        var tx = player.tileX + fx
+        var ty = player.tileY + fy
+        if (tx < 0 || ty < 0 || tx >= mapW || ty >= mapH) return
+
+        var current = World.getTile(world, tx, ty)
+        // Build on walkable ground, or reinforce a door/window. Never on walls,
+        // containers, or an already-fortified tile.
+        if (!World.WALKABLE[current] && current !== World.T.DOOR && current !== World.T.WINDOW) {
+            showMessage("Can't build there")
+            return
+        }
+        if (barricades[tx + "," + ty]) {
+            showMessage("Already fortified there")
+            return
+        }
+
+        // Consume materials
+        for (var mat in r.materials) {
+            _removeFromInventory(mat, r.materials[mat])
+        }
+
+        // Place the tile and track its health (record the underlying tile so
+        // destruction reverts the map cleanly).
+        barricades[tx + "," + ty] = {
+            recipeId: recipeId,
+            tile: r.tile,
+            base: current,
+            hp: r.hp,
+            maxHp: r.hp,
+            blocks: r.blocks,
+            damagePerSecond: r.damagePerSecond || 0
+        }
+        World.setTile(world, tx, ty, r.tile)
+        playSfx(sfxPickup)  // TODO: dedicated hammer/build SFX
+        showMessage("Built " + r.name)
+        gameCanvas.requestPaint()
+    }
+
+    function _removeBarricade(tx, ty) {
+        var key = tx + "," + ty
+        var b = barricades[key]
+        if (!b) return
+        World.setTile(world, tx, ty, b.base)
+        delete barricades[key]
+    }
+
+    // Zombies beat down solid barricades; barbed wire shreds zombies walking
+    // through it (and wears out as it does). Destroyed fortifications revert
+    // to the underlying tile.
+    function _updateBarricades(dt) {
+        if (!player || !world) return
+        var toRemove = []
+        for (var key in barricades) {
+            var b = barricades[key]
+            var parts = key.split(",")
+            var bx = parseInt(parts[0], 10)
+            var by = parseInt(parts[1], 10)
+            var cx = bx * tileSize + tileSize / 2
+            var cy = by * tileSize + tileSize / 2
+
+            if (b.tile === World.T.BARBED_WIRE) {
+                for (var i = 0; i < zombies.length; i++) {
+                    var z = zombies[i]
+                    if (z.state === "dead" || z.state === "corpse") continue
+                    if (Math.floor(z.x / tileSize) === bx && Math.floor(z.y / tileSize) === by) {
+                        z.health -= b.damagePerSecond * dt
+                        z.hitFlash = Math.max(z.hitFlash, 0.3)
+                        b.hp -= 5 * dt
+                        if (z.health <= 0 && z.state !== "corpse") {
+                            z.state = "corpse"
+                            z.loot = Entities.generateCorpseLoot(z.type)
+                            z.looted = false
+                            killCount++
+                            _createBloodEffect(z.x, z.y, 6)
+                            playSfx(sfxZombieDeath)
+                        }
+                    }
+                }
+            } else {
+                // Solid barricade: adjacent chasing/attacking zombies smash it.
+                for (var j = 0; j < zombies.length; j++) {
+                    var z2 = zombies[j]
+                    if (z2.state === "dead" || z2.state === "corpse") continue
+                    if (z2.state !== "chase" && z2.state !== "attack") continue
+                    if (Utils.dist(z2.x, z2.y, cx, cy) < 34 && z2.attackCooldown <= 0) {
+                        var def = Entities.ZOMBIE_TYPES[z2.type]
+                        z2.attackCooldown = def ? def.attackSpeed : 1.0
+                        b.hp -= def ? def.damage : 8
+                        z2.facing = Utils.angleTo(z2.x, z2.y, cx, cy)
+                    }
+                }
+            }
+
+            if (b.hp <= 0) toRemove.push([bx, by])
+        }
+        for (var k = 0; k < toRemove.length; k++) {
+            _removeBarricade(toRemove[k][0], toRemove[k][1])
+        }
     }
 
     function _updateEffects(dt) {
@@ -1440,7 +1588,7 @@ Item {
                         root.gameTimer.running = false
                         root.saveGame()
                         root.gameCanvas.requestPaint()
-                    } else if (root.gameState === "paused" || root.gameState === "inventory" || root.gameState === "looting") {
+                    } else if (root.gameState === "paused" || root.gameState === "inventory" || root.gameState === "looting" || root.gameState === "building") {
                         root.gameState = "playing"
                         root.closeLoot()
                         root.gameTimer.running = true
@@ -1469,6 +1617,17 @@ Item {
                         root.gameTimer.running = false
                         root.gameCanvas.requestPaint()
                     } else if (root.gameState === "inventory") {
+                        root.gameState = "playing"
+                        root.gameTimer.running = true
+                        root.gameCanvas.requestPaint()
+                    }
+                    event.accepted = true
+                } else if (event.key === Qt.Key_B) {
+                    if (root.gameState === "playing") {
+                        root.gameState = "building"
+                        root.gameTimer.running = false
+                        root.gameCanvas.requestPaint()
+                    } else if (root.gameState === "building") {
                         root.gameState = "playing"
                         root.gameTimer.running = true
                         root.gameCanvas.requestPaint()
@@ -1608,6 +1767,16 @@ Item {
                 // Draw effects
                 for (var ei = 0; ei < root.effects.length; ei++) {
                     Render.drawBloodEffect(ctx, root.effects[ei], camX, camY)
+                }
+
+                // Draw health bars on damaged fortifications
+                for (var bkey in root.barricades) {
+                    var bb = root.barricades[bkey]
+                    if (bb.hp >= bb.maxHp) continue
+                    var bparts = bkey.split(",")
+                    var bhpX = parseInt(bparts[0], 10) * root.tileSize + root.tileSize/2 - camX
+                    var bhpY = parseInt(bparts[1], 10) * root.tileSize - 6 - camY
+                    Render.drawHealthBar(ctx, bhpX, bhpY, 20, bb.hp / bb.maxHp)
                 }
 
                 // Restore — back to screen space for UI elements
@@ -2395,6 +2564,104 @@ Item {
                             small: true
                             onClicked: root.closeLoot()
                         }
+                    }
+                }
+            }
+        }
+
+        // ════════════════════════════════════════════════
+        // Build Menu (B)
+        // ════════════════════════════════════════════════
+        Rectangle {
+            visible: root.gameState === "building"
+            anchors.fill: parent
+            color: "#dd000000"
+
+            Rectangle {
+                anchors.centerIn: parent
+                width: Math.min(parent.width - 80, 560)
+                height: Math.min(parent.height - 80, 360)
+                color: "#222222"
+                radius: 8
+                border.color: "#444444"
+                border.width: 1
+
+                Column {
+                    anchors.fill: parent
+                    anchors.margins: 20
+                    spacing: 12
+
+                    Text {
+                        text: "BUILD"
+                        color: "#ffffff"
+                        font.pixelSize: 24
+                        font.bold: true
+                    }
+                    Text {
+                        text: "Aim with the mouse — the fortification is placed on the tile in front of you."
+                        color: "#888888"
+                        font.pixelSize: 13
+                        wrapMode: Text.WordWrap
+                        width: parent.width
+                    }
+
+                    Rectangle { width: parent.width; height: 1; color: "#444444" }
+
+                    Repeater {
+                        model: root.recipeIds()
+
+                        Rectangle {
+                            width: parent ? parent.width : 0
+                            height: 60
+                            radius: 6
+                            color: buildRowMouse.containsMouse ? "#333344" : "#2a2a33"
+                            border.color: root.canCraft(modelData) ? "#5acf3a" : "#444444"
+                            border.width: 1
+
+                            Column {
+                                anchors.left: parent.left
+                                anchors.leftMargin: 12
+                                anchors.verticalCenter: parent.verticalCenter
+                                spacing: 3
+
+                                Text {
+                                    text: Items.RECIPES[modelData] ? Items.RECIPES[modelData].name : modelData
+                                    color: "#ffffff"
+                                    font.pixelSize: 15
+                                    font.bold: true
+                                }
+                                Text {
+                                    text: root.recipeMaterials(modelData)
+                                    color: root.canCraft(modelData) ? "#9adf4a" : "#cc6666"
+                                    font.pixelSize: 12
+                                }
+                            }
+
+                            Text {
+                                anchors.right: parent.right
+                                anchors.rightMargin: 12
+                                anchors.verticalCenter: parent.verticalCenter
+                                text: root.canCraft(modelData) ? "Build ►" : "need materials"
+                                color: root.canCraft(modelData) ? "#5acf3a" : "#666666"
+                                font.pixelSize: 13
+                                font.bold: true
+                            }
+
+                            MouseArea {
+                                id: buildRowMouse
+                                anchors.fill: parent
+                                hoverEnabled: true
+                                onClicked: root.tryBuild(modelData)
+                            }
+                        }
+                    }
+
+                    Item { width: 1; height: 8 }
+
+                    Text {
+                        text: "B or Esc to close"
+                        color: "#666666"
+                        font.pixelSize: 12
                     }
                 }
             }

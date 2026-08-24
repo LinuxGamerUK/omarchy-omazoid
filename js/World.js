@@ -23,7 +23,7 @@ var T = {
 var WALKABLE = {};
 [T.GRASS, T.ROAD, T.WOOD_FLOOR, T.CONCRETE, T.DOOR_OPEN, T.WATER,
  T.SIDEWALK, T.FARMLAND, T.DIRT, T.FLOOR_TILE, T.ASPHALT,
- T.GRAVEL, T.SAND, T.RUBBLE, T.BLOOD, T.PAVEMENT, T.FLOWER].forEach(function(t) { WALKABLE[t] = true; });
+ T.GRAVEL, T.SAND, T.RUBBLE, T.BLOOD, T.PAVEMENT, T.FLOWER, T.BARBED_WIRE].forEach(function(t) { WALKABLE[t] = true; });
 
 // Container tiles (can be looted)
 var CONTAINERS = {};

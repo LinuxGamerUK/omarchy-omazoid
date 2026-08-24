@@ -125,12 +125,19 @@ fixed several critical logic bugs. See commit `99784f8` for the full detail.
 Roughly in priority order. Each is independent — pick what sounds fun.
 
 ### Core survival depth
-- [ ] **Crafting system** — materials already exist (wood_plank, nails,
-      metal_scrap, rope, duct_tape, sheet). Recipes: barricades, bandages
-      (cloth → sheet), makeshift weapons, water collector, traps.
-- [ ] **Barricading / fortification** — `BARRICADE`, `BARBED_WIRE`,
-      `SANDBAG` tiles exist but aren't buildable. Let the player board up
-      doors/windows with planks+nails (and let zombies break them down).
+- [x] **Crafting system (v1)** — build menu (B key) with recipes drawn from
+      `Items.RECIPES`. Materials (wood_plank, nails, metal_scrap, …) are
+      consumed from inventory; the build menu shows have/need per material.
+      More recipes (bandages, makeshift weapons, water collector, traps)
+      are easy to add — just append to `RECIPES`.
+- [x] **Barricading / fortification (v1)** — `BARRICADE` (solid, zombies
+      beat it down, has HP) and `BARBED_WIRE` (passable, shreds zombies
+      walking through it, wears out). Built on the facing tile (ground or
+      reinforcing a door/window). Zombies smash barricades on contact;
+      destroyed fortifications revert to the underlying tile. HP bar drawn
+      above damaged fortifications. Persisted in saves (`barricades`).
+      TODO: `SANDBAG` recipe, dedicated build SFX, zombie pathfinding around
+      barricades (they currently just pile up and smash).
 - [ ] **Water & power shutoff over time** — taps/toilets give water early,
       run dry after N days; fridges stop preserving food. Drives
       `WATER_COLLECTOR` and rain-barrel crafting.
