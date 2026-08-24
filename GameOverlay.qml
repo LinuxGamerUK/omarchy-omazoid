@@ -602,6 +602,11 @@ Item {
         playSfx(sfxPickup)
         showMessage("Looted " + (itemDef ? itemDef.name : item.id))
         lootItems.splice(index, 1)
+        // Reassign so the property-var binding fires and the loot-list Repeater
+        // (model: lootItems.length) refreshes. splice() mutates in place and
+        // never notifies QML, so the taken row would otherwise stay visible —
+        // looking like the click did nothing.
+        lootItems = lootItems.slice()
     }
 
     function takeAllLoot() {
